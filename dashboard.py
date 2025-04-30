@@ -7,7 +7,7 @@ import captacao_e_geracao_dados as cgd
 import dashboard_helper as dh
 import calculos_e_formulas as calculos
 from utils_validacao import checar_anomalias
-from utils_comissao import calcular_comissao, CFG
+from utils_comissao import calcular_comissao, DEFAULT_CONFIG
 
 # ─── Configurações de login ───────────────────────────────────
 USUARIO = "carlos"
@@ -974,10 +974,10 @@ with aba8:
         c1.metric("Média da Viagem (km/L)", f"{detalhes['media_trip']:.2f}", help=tip_media)
         c1.caption(f"Histórico: {detalhes['media_ref']:.2f}")
 
-        c2.metric("Receita/dia", f"R$ {detalhes['rec_por_dia']:.2f}", help=tip_rec)
-        c2.caption(f"Histórico: R$ {detalhes['rec_dia_ref']:.2f}")
+        c2.metric("Receita/dia", f"R$ {detalhes['receita_por_dia']:.2f}", help=tip_rec)
+        c2.caption(f"Histórico: R$ {detalhes['receita_ref']:.2f}")
 
-        c3.metric("Dias ociosos", detalhes["idle_days"], help=tip_idle)
+        c3.metric("Dias ociosos", detalhes["dias_ociosos"], help=tip_idle)
 
         st.markdown("---")
         st.subheader("Resultado")
@@ -987,6 +987,6 @@ with aba8:
         )
         st.metric("Nota Final", f"{detalhes['nota_final']*100:.1f} %")
         st.metric("Comissão Sugerida", f"R$ {detalhes['comissao']:.2f}", delta=None)
-        st.caption(f"Parâmetros atuais: MAX = R$ {CFG['MAX_COMISSAO']:.0f}, "
-                   f"W_MEDIA={CFG['W_MEDIA']:.0%}, W_DIA={CFG['W_DIA']:.0%}, "
-                   f"Ociosidade máx. {CFG['MAX_IDLE_PENALTY']:.0%}.")
+        st.caption(f"Parâmetros atuais: COMISSAO_MAX = R$ {DEFAULT_CONFIG['COMISSAO_MAXIMA']:.0f}, "
+                   f"PESO_CONSUMO={DEFAULT_CONFIG['PESO_CONSUMO']:.0%}, PESO_RECEITA={DEFAULT_CONFIG['PESO_RECEITA']:.0%}, "
+                   f"Ociosidade máx. {DEFAULT_CONFIG['PENALIDADE_OCIOSIDADE_MAX']:.0%}.")

@@ -1,122 +1,181 @@
-import pandas as pd, numpy as np, datetime as dt
+"""
+Módulo de cálculo de comissão de motoristas baseado em desempenho, receita e ociosidade.
+Interface pública principal: `calcular_comissao` (não deve ser alterada).
+"""
+import pandas as pd
+import numpy as np
+from typing import Any, Tuple, Dict
 
-CFG = {
-    # ─── Parâmetros de consumo ────────────────────────────────────
-    "INC_MAX": 0.40,            # +40 % de ganho na média km/L → pontuação 1
-    "REC_MAX": 1.50,           # +50 % de ganho em receita/dia → pontuação 1
+# =============================================
+# Configurações padrão de comissão
+# =============================================
+DEFAULT_CONFIG = {
+    "INCREMENTO_CONSUMO_MAXIMO": 0.30,   # +40% → score_consumo = 1
+    "INCREMENTO_RECEITA_MAXIMO": 1.30,   # +50% → score_receita = 1
 
-    # ─── Pesos das dimensões ─────────────────────────────────────
-    "W_MEDIA": 0.60,           # 60 % do peso na média km/L
-    "W_DIA":   0.40,           # 40 % do peso em receita/dia
+    "PESO_CONSUMO": 0.70,                # peso do consumo no cálculo final
+    "PESO_RECEITA": 0.30,                # peso da receita no cálculo final
 
-    # ─── Penalidade de ociosidade ───────────────────────────────
-    "IDLE_NORMAL": 4,          # até 4 dias sem punição
-    "IDLE_FULL":   10,         # ≥10 dias = punição máxima
-    "MAX_IDLE_PENALTY": 0.30,  # até −30 % na nota
+    "DIAS_OCIOSIDADE_NORMAL": 4,         # dias sem penalidade
+    "DIAS_OCIOSIDADE_PLENO": 10,         # dias para penalidade máxima
+    "PENALIDADE_OCIOSIDADE_MAX": 0.30,   # até -30% na nota final
 
-    # ─── Comissão ───────────────────────────────────────────────
-    "MAX_COMISSAO": 500.0,     # teto absoluto
-    "MIN_COMISSAO": 150.0,     # piso absoluto
+    "COMISSAO_MAXIMA": 500.00,
+    "COMISSAO_MINIMA": 150.00,
 
-    # ─── Janelas e referências ──────────────────────────────────
-    "WINDOW_DIAS":     90,     # janela p/ cálculo do histórico
-    "METRICA_RECEITA": "lucro_bruto",  # coluna de receita usada
+    "JANELA_HISTORICO_DIAS": 90,
+    "COLUNA_RECEITA": "lucro_bruto",
 }
 
-# ----------------------------------------------------------------
-# helpers
-# ----------------------------------------------------------------
 
-def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
-    """Limita *x* ao intervalo [lo, hi]."""
-    return max(lo, min(hi, x))
+def _clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
+    """Limita `value` ao intervalo [minimum, maximum]."""
+    return max(minimum, min(value, maximum))
 
-# ----------------------------------------------------------------
-# função principal
-# ----------------------------------------------------------------
+
+def _extrair_historico(
+    df_viagens: pd.DataFrame,
+    placa: str,
+    inicio: pd.Timestamp,
+    janela_dias: int,
+    id_atual: Any,
+) -> pd.DataFrame:
+    """Retorna histórico de viagens da mesma `placa` na janela antes de `inicio`, excluindo `id_atual`."""
+    data_inicio = inicio - pd.Timedelta(days=janela_dias)
+    return df_viagens.query(
+        "veiculo == @placa and data_ida >= @data_inicio and id != @id_atual"
+    ).copy()
+
+
+def _calcular_referencias(
+    hist_df: pd.DataFrame,
+    row: pd.Series,
+    cfg: dict,
+) -> Tuple[float, float]:
+    """Retorna média histórica de consumo e mediana de receita diária como referência."""
+    media_consumo_ref = hist_df["media"].mean()
+    # calcula dias de viagem histórico
+    if "dias_viagem" not in hist_df.columns:
+        hist_df = hist_df.assign(
+            dias_viagem=(
+                pd.to_datetime(hist_df["data_volta"]) - pd.to_datetime(hist_df["data_ida"])
+            ).dt.days.clip(lower=1)
+        )
+    # mediana da receita por dia
+    receita_col = cfg["COLUNA_RECEITA"]
+    receita_diaria_ref = (hist_df[receita_col] / hist_df["dias_viagem"]).median()
+
+    # fallback sem histórico
+    if np.isnan(media_consumo_ref):
+        media_consumo_ref = row["media"]
+    dias = max((pd.to_datetime(row["data_volta"]) - pd.to_datetime(row["data_ida"])).days, 1)
+    if np.isnan(receita_diaria_ref):
+        receita_diaria_ref = row[receita_col] / dias
+
+    return media_consumo_ref, receita_diaria_ref
+
+
+def _pontuar_consumo(
+    media_trip: float,
+    media_ref: float,
+    incremento_max: float,
+) -> float:
+    """Normaliza variação de consumo em [-1,1]."""
+    variacao = media_trip / media_ref - 1.0
+    return _clamp(variacao / incremento_max, -1.0, 1.0)
+
+
+def _pontuar_receita(
+    receita_trip: float,
+    receita_ref: float,
+    incremento_max: float,
+) -> float:
+    """Normaliza variação de receita diária em [-1,1]."""
+    variacao = receita_trip / receita_ref - 1.0
+    return _clamp(variacao / (incremento_max - 1.0), -1.0, 1.0)
+
+
+def _obter_dias_ociosos(
+    hist_df: pd.DataFrame,
+    data_ida: pd.Timestamp,
+) -> int:
+    """Retorna número de dias desde último `data_volta` antes de `data_ida`."""
+    antes = hist_df[hist_df["data_volta"] < data_ida]
+    if antes.empty:
+        return 0
+    ultimo = antes.sort_values("data_volta").iloc[-1]["data_volta"]
+    return (data_ida - pd.to_datetime(ultimo)).days
+
+
+def _calcular_penalidade_ociosidade(
+    dias_ociosos: int,
+    normal: int,
+    pleno: int,
+    penalidade_max: float,
+) -> float:
+    """Calcula penalidade baseada em `dias_ociosos` comparado a limites."""
+    if dias_ociosos <= normal:
+        return 0.0
+    span = max(pleno - normal, 1)
+    frac = (dias_ociosos - normal) / span
+    return _clamp(frac, 0.0, 1.0) * penalidade_max
+
 
 def calcular_comissao(
     viagem_row: pd.Series,
     df_viagens: pd.DataFrame,
-    cfg: dict = CFG,
-) -> dict:
-    """Calcula comissão sugerida para *viagem_row* considerando histórico.
-
-    A escala é calibrada para que **nota = 0,50** (isto é, comissão ≈ R$ 250)
-    quando o motorista repete a própria média histórica (consumo *e* receita/dia).
+    cfg: dict = DEFAULT_CONFIG,
+) -> Dict[str, Any]:
     """
+    Interface pública – NÃO MODIFICAR.
+    Calcula comissão para `viagem_row` com base em consumo, receita e ociosidade.
+    """
+    placa = viagem_row["veiculo"]
+    id_atual = viagem_row["id"]
+    data_ida = pd.to_datetime(viagem_row["data_ida"])
+    data_volta = pd.to_datetime(viagem_row["data_volta"])
+    dias_atual = max((data_volta - data_ida).days, 1)
 
-    vid, placa = viagem_row["id"], viagem_row["veiculo"]
-    ida   = pd.to_datetime(viagem_row["data_ida"])
-    volta = pd.to_datetime(viagem_row["data_volta"])
-    dias_trip = max((volta - ida).days, 1)
-
-    # ─── 1. Histórico da mesma placa ────────────────────────────
-    hist_inicio = ida - pd.Timedelta(days=cfg["WINDOW_DIAS"])
-    hist = df_viagens.query(
-        "veiculo == @placa and data_ida >= @hist_inicio and id != @vid"
+    # histórico e referências
+    historico = _extrair_historico(
+        df_viagens, placa, data_ida, cfg["JANELA_HISTORICO_DIAS"], id_atual
     )
+    media_ref, receita_ref = _calcular_referencias(historico, viagem_row, cfg)
 
-    media_ref = hist["media"].mean()
-    met = cfg["METRICA_RECEITA"]
-
-    if "dias_viagem" not in hist.columns:
-        hist = hist.assign(
-            dias_viagem=(hist["data_volta"] - hist["data_ida"]).dt.days.clip(lower=1)
-        )
-
-    rec_dia_ref = (hist[met] / hist["dias_viagem"]).median()
-
-    # fallback se não houver histórico suficiente
-    if np.isnan(media_ref):
-        media_ref = viagem_row["media"]
-    if np.isnan(rec_dia_ref):
-        rec_dia_ref = viagem_row[met] / dias_trip
-
-    # ─── 2. Pontuações normalizadas (-1 … 1) ─────────────────────
+    # desempenho atual
     media_trip = viagem_row["media"]
-    perc_inc_med = (media_trip / media_ref) - 1.0
-    score_media_norm = _clamp(perc_inc_med / cfg["INC_MAX"], -1.0, 1.0)
+    receita_por_dia = viagem_row[cfg["COLUNA_RECEITA"]] / dias_atual
+    score_consumo = _pontuar_consumo(media_trip, media_ref, cfg["INCREMENTO_CONSUMO_MAXIMO"])
+    score_receita = _pontuar_receita(receita_por_dia, receita_ref, cfg["INCREMENTO_RECEITA_MAXIMO"])
 
-    rec_por_dia = viagem_row[met] / dias_trip
-    perc_inc_rec = (rec_por_dia / rec_dia_ref) - 1.0
-    score_rec_norm = _clamp(perc_inc_rec / (cfg["REC_MAX"] - 1.0), -1.0, 1.0)
-
-    # ─── 3. Penalidade de ociosidade ────────────────────────────
-    prev = hist[hist["data_volta"] < ida].sort_values("data_volta").tail(1)
-    idle_days = (ida - prev["data_volta"].iloc[0]).days if not prev.empty else 0
-
-    if idle_days <= cfg["IDLE_NORMAL"]:
-        idle_pen_frac = 0.0
-    else:
-        span = max(cfg["IDLE_FULL"] - cfg["IDLE_NORMAL"], 1)
-        idle_pen_frac = _clamp((idle_days - cfg["IDLE_NORMAL"]) / span, 0.0, 1.0)
-
-    pen = idle_pen_frac * cfg["MAX_IDLE_PENALTY"]  # 0 → MAX_IDLE_PENALTY
-
-    # ─── 4. Nota final (baseline 0.50) ──────────────────────────
-    nota_baseline = 0.50  # média histórica → 50 % da nota
-    nota_delta = 0.50 * (
-        cfg["W_MEDIA"] * score_media_norm + cfg["W_DIA"] * score_rec_norm
+    # ociosidade
+    dias_ociosos = _obter_dias_ociosos(historico, data_ida)
+    penalidade = _calcular_penalidade_ociosidade(
+        dias_ociosos,
+        cfg["DIAS_OCIOSIDADE_NORMAL"],
+        cfg["DIAS_OCIOSIDADE_PLENO"],
+        cfg["PENALIDADE_OCIOSIDADE_MAX"],
     )
-    nota_raw = nota_baseline + nota_delta
-    nota = _clamp(nota_raw, 0.0, 1.0) * (1.0 - pen)
 
-    # ─── 5. Comissão (piso / teto) ─────────────────────────────
-    com_bruto = round(nota * cfg["MAX_COMISSAO"], 2)
-    comissao = max(cfg["MIN_COMISSAO"], min(cfg["MAX_COMISSAO"], com_bruto))
+    # nota final e comissão
+    baseline = 0.50
+    delta = 0.50 * (cfg["PESO_CONSUMO"] * score_consumo + cfg["PESO_RECEITA"] * score_receita)
+    nota_bruta = baseline + delta
+    nota_final = _clamp(nota_bruta, 0.0, 1.0) * (1.0 - penalidade)
 
-    # ─── 6. Retorno detalhado ──────────────────────────────────
+    valor_bruto = round(nota_final * cfg["COMISSAO_MAXIMA"], 2)
+    comissao = _clamp(valor_bruto, cfg["COMISSAO_MINIMA"], cfg["COMISSAO_MAXIMA"])
+
     return {
         "placa": placa,
-        "media_trip":   media_trip,
-        "media_ref":    media_ref,
-        "score_media_norm": score_media_norm,
-        "rec_por_dia":  rec_por_dia,
-        "rec_dia_ref":  rec_dia_ref,
-        "score_rec_norm":  score_rec_norm,
-        "idle_days":    idle_days,
-        "pen":          pen,
-        "nota_final":   nota,
-        "comissao":     comissao,
+        "media_trip": media_trip,
+        "media_ref": media_ref,
+        "score_consumo": score_consumo,
+        "receita_por_dia": receita_por_dia,
+        "receita_ref": receita_ref,
+        "score_receita": score_receita,
+        "dias_ociosos": dias_ociosos,
+        "penalidade_ociosidade": penalidade,
+        "nota_final": nota_final,
+        "comissao": comissao,
     }

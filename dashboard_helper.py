@@ -377,6 +377,10 @@ def plot_scatter_custo_vs_lucro_motoristas(df):
     )
 
 def plot_scatter_custo_vs_lucro_veiculo(df):
+    
+    # 1) Filtrar viagens inválidas (opção A)
+    df = df[df["km_total"] >= 0]
+    
     plot_scatter_base(
         df, 
         x_col="lucro_bruto", 
