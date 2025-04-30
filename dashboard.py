@@ -9,6 +9,31 @@ import calculos_e_formulas as calculos
 from utils_validacao import checar_anomalias
 from utils_comissao import calcular_comissao, CFG
 
+# ─── Configurações de login ───────────────────────────────────
+USUARIO = "carlos"
+SENHA    = "110712"
+
+# Inicializa estado
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+# Função de login
+def tela_login():
+    st.title("🔐 Login")
+    user = st.text_input("Usuário")
+    pwd  = st.text_input("Senha", type="password")
+    if st.button("Entrar"):
+        if user == USUARIO and pwd == SENHA:
+            st.session_state.autenticado = True
+        else:
+            st.error("Credenciais incorretas")
+
+# Se não autenticado, exibe login e interrompe
+if not st.session_state.autenticado:
+    tela_login()
+    st.stop()
+# ────────────────────────────────────────────────────────────────
+
 st.set_page_config(page_title="Dashboard", layout="wide")
 
 @st.cache_data

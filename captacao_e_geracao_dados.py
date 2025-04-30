@@ -98,48 +98,63 @@ def enriquecer_dados(df_desp_viagem, df_desp_fixa, df_motorista, df_veiculo, df_
 # 3. Cruzamento de Dados e Geração dos DataFrames Necessários
 # ============================
 
-def processar_dados_historicos(df_viagem, df_desp_viagem, df_desp_fixas):
-    """Retorna dataframe mensal consolidado com KPIs operacionais/financeiros."""
-    df = df_viagem.copy()
-    df["soma_frete_row"] = (df["frete_ida"].fillna(0)
-                            + df["frete_volta"].fillna(0)
-                            + df["frete_extra"].fillna(0))
+def processar_dados_historicos(df_viagem,
+                               df_desp_viagem,
+                               df_desp_fixas):
+    """Consolida KPIs mensais (robusto a datas vazias)."""
 
+    # ───── 1. Sanitiza colunas de data ────────────────────────────
+    for _df, col in [(df_desp_viagem, "data"), (df_desp_fixas, "data")]:
+        _df[col] = pd.to_datetime(_df[col], errors="coerce")
+        _df.dropna(subset=[col], inplace=True)
+
+    # ───── 2. KPIs de viagens (já estavam OK) ─────────────────────
+    df = df_viagem.copy()
+    df["soma_frete_row"] = (
+        df["frete_ida"].fillna(0)
+        + df["frete_volta"].fillna(0)
+        + df["frete_extra"].fillna(0)
+    )
     historico_mensal = (
         df.groupby(pd.Grouper(key="data_ida", freq="M"))
-          .agg(soma_fretes     = ("soma_frete_row", "sum"),
-               lucro_bruto     = ("lucro_bruto",    "sum"),
-               km_total        = ("km_total",       "sum"))
+          .agg(soma_fretes=("soma_frete_row", "sum"),
+               lucro_bruto=("lucro_bruto", "sum"),
+               km_total   =("km_total",    "sum"))
           .reset_index()
     )
 
+    # ───── 3. Despesas viagem/fixas via RESAMPLE ─────────────────
     despesas_viagem_mensal = (
-        df_desp_viagem.groupby(pd.Grouper(key="data", freq="M"))["valor"]
-                      .sum().reset_index(name="despesa_total_viagem")
+        df_desp_viagem
+            .resample("M", on="data")["valor"]
+            .sum()
+            .reset_index(name="despesa_total_viagem")
     )
+
+    def _is_imposto(cat: pd.Series) -> pd.Series:
+        return cat.str.upper().isin(["IMPOSTO", "DETRAN"])
 
     despesas_fixas_mensal = (
-        df_desp_fixas.groupby(pd.Grouper(key="data", freq="M"))
-          .agg(despesa_fixa_total     = ("valor", "sum"),
-               despesa_livre_impostos = ("valor",
-                   lambda x: x[~df_desp_fixas.loc[x.index, "categoria"]
-                               .str.upper().isin(["IMPOSTO","DETRAN"])].sum()),
-               capex                  = ("valor",
-                   lambda x: x[df_desp_fixas.loc[x.index, "categoria"]
-                               .str.upper() == "PRESTACAO"].sum()))
-          .reset_index()
+        df_desp_fixas
+            .resample("M", on="data")
+            .agg(despesa_fixa_total=("valor", "sum"),
+                 despesa_livre_impostos=("valor",
+                     lambda x: x[~_is_imposto(df_desp_fixas.loc[x.index, "categoria"])].sum()),
+                 capex=("valor",
+                     lambda x: x[df_desp_fixas.loc[x.index, "categoria"]
+                                   .str.upper().eq("PRESTACAO")].sum()))
+            .reset_index()
     )
 
-    # Junção
+    # ───── 4. Merge & métricas derivadas (inalterado) ────────────
     hist = (
         historico_mensal
-        .merge(despesas_viagem_mensal, left_on="data_ida",
-               right_on="data", how="left").drop(columns="data")
-        .merge(despesas_fixas_mensal, left_on="data_ida",
-               right_on="data", how="left").drop(columns="data")
+          .merge(despesas_viagem_mensal, left_on="data_ida",
+                 right_on="data", how="left").drop(columns="data")
+          .merge(despesas_fixas_mensal, left_on="data_ida",
+                 right_on="data", how="left").drop(columns="data")
     )
 
-    # KPIs derivados
     hist["despesa_total"]          = hist["despesa_total_viagem"].fillna(0) + hist["despesa_fixa_total"].fillna(0)
     hist["faturamento_viagem_mes"] = hist["lucro_bruto"] - hist["despesa_fixa_total"]
     hist["lucro_liquido"]          = hist["lucro_bruto"] - hist["despesa_fixa_total"]

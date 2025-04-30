@@ -142,5 +142,23 @@ def checar_anomalias(data, max_rows=5):
                 ),
                 "sugestao": "Corrigir sinal (→ positivo) ou remover teste/digitação duplicada."
             })
+            
+    # --------------------------------------------------
+    # 7. registros sem data (NÃO entram na análise histórica)
+    # --------------------------------------------------
+    for nome, df_ in [("despesas_viagem", dv), ("despesas_fixas", df)]:
+        mask = pd.to_datetime(df_["data"], errors="coerce").isna()
+        if mask.any():
+            avisos.append({
+                "msg": f"Registros sem data em {nome} (ignorados na análise histórica)",
+                "qtd": int(mask.sum()),
+                "nivel": "warning",
+                "detalhes": _sample_rows(
+                    df_.loc[mask, [c for c in ["descricao", "categoria", "valor", "id"] if c in df_.columns]],
+                    [c for c in ["descricao", "categoria", "valor", "id"] if c in df_.columns],
+                    max_rows,
+                ),
+                "sugestao": "Informar uma data válida; registros sem data não são considerados nos Gráficos mensais.",
+            })
 
     return avisos
