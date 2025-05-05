@@ -5,28 +5,7 @@ Interface pública principal: `calcular_comissao` (não deve ser alterada).
 import pandas as pd
 import numpy as np
 from typing import Any, Tuple, Dict
-
-# =============================================
-# Configurações padrão de comissão
-# =============================================
-DEFAULT_CONFIG = {
-    "INCREMENTO_CONSUMO_MAXIMO": 0.30,   # +40% → score_consumo = 1
-    "INCREMENTO_RECEITA_MAXIMO": 1.30,   # +50% → score_receita = 1
-
-    "PESO_CONSUMO": 0.70,                # peso do consumo no cálculo final
-    "PESO_RECEITA": 0.30,                # peso da receita no cálculo final
-
-    "DIAS_OCIOSIDADE_NORMAL": 4,         # dias sem penalidade
-    "DIAS_OCIOSIDADE_PLENO": 10,         # dias para penalidade máxima
-    "PENALIDADE_OCIOSIDADE_MAX": 0.30,   # até -30% na nota final
-
-    "COMISSAO_MAXIMA": 500.00,
-    "COMISSAO_MINIMA": 150.00,
-
-    "JANELA_HISTORICO_DIAS": 90,
-    "COLUNA_RECEITA": "lucro_bruto",
-}
-
+import config
 
 def _clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
     """Limita `value` ao intervalo [minimum, maximum]."""
@@ -124,7 +103,7 @@ def _calcular_penalidade_ociosidade(
 def calcular_comissao(
     viagem_row: pd.Series,
     df_viagens: pd.DataFrame,
-    cfg: dict = DEFAULT_CONFIG,
+    cfg: dict = config.DEFAULT_CONFIG,
 ) -> Dict[str, Any]:
     """
     Interface pública – NÃO MODIFICAR.

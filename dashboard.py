@@ -7,32 +7,41 @@ import captacao_e_geracao_dados as cgd
 import dashboard_helper as dh
 import calculos_e_formulas as calculos
 from utils_validacao import checar_anomalias
-from utils_comissao import calcular_comissao, DEFAULT_CONFIG
+from utils_comissao import calcular_comissao
+import config
 
 # ─── Configurações de login ───────────────────────────────────
-USUARIO = "carlos"
-SENHA    = "110712"
+USUARIO = config.USUARIO
+SENHA   = config.SENHA
 
-# Inicializa estado
+# Estado inicial
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
+if "erro_login" not in st.session_state:
+    st.session_state.erro_login = False  # flag para mensagens de erro
 
-# Função de login
-def tela_login():
-    st.title("🔐 Login")
-    user = st.text_input("Usuário")
-    pwd  = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
-        if user == USUARIO and pwd == SENHA:
-            st.session_state.autenticado = True
-        else:
-            st.error("Credenciais incorretas")
+# Callback executado ANTES do rerun automático do Streamlit
+def _autenticar():
+    user = st.session_state.user
+    pwd  = st.session_state.pwd
+    if user == USUARIO and pwd == SENHA:
+        st.session_state.autenticado = True          # rerun vem sozinho
+    else:
+        st.session_state.erro_login = True
 
-# Se não autenticado, exibe login e interrompe
+# Se ainda não autenticado, mostra tela de login
 if not st.session_state.autenticado:
-    tela_login()
-    st.stop()
-# ────────────────────────────────────────────────────────────────
+    st.title("🔐 Login")
+    st.text_input("Usuário", key="user")
+    st.text_input("Senha", type="password", key="pwd")
+    st.button("Entrar", on_click=_autenticar)
+
+    if st.session_state.erro_login:
+        st.error("Credenciais incorretas")
+        st.session_state.erro_login = False  # reseta para próxima tentativa
+
+    st.stop()  # bloqueia execução do resto enquanto não logar
+# ──────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 
@@ -480,19 +489,19 @@ with aba2: #Lucro de Viagem por mês
 
     c1.markdown(
         f'<div title="{_tooltip_lucro_bruto}">'
-        f'{dh.card_compacto("Lucro Bruto", total_gross, prefixo="R$")}'
+        f'{dh.card_compacto("Lucro Bruto", total_gross, prefixo="R$",tipo="Flex")}'
         f'</div>',
         unsafe_allow_html=True
     )
     c2.markdown(
         f'<div title="{_tooltip_desp_fixa}">'
-        f'{dh.card_compacto("Despesa Fixa Total", total_fix, prefixo="R$")}'
+        f'{dh.card_compacto("Despesa Fixa Total", total_fix, prefixo="R$", tipo="Negative")}'
         f'</div>',
         unsafe_allow_html=True
     )
     c3.markdown(
         f'<div title="{_tooltip_lucro_liq}">'
-        f'{dh.card_compacto("Lucro Líquido", total_net, prefixo="R$")}'
+        f'{dh.card_compacto("Lucro Líquido", total_net, prefixo="R$", tipo="Flex")}'
         f'</div>',
         unsafe_allow_html=True
     )
@@ -560,7 +569,7 @@ with aba3:  #Análise Financeira
     with col7:
         st.markdown(
             f'<div title="{tooltip_margem}">'
-            f'{dh.card_compacto("Margem de Lucro Liquido", metricas_gerais["margem_lucro_liquido_%"], unidade="%")}'
+            f'{dh.card_compacto("Margem de Lucro Liquido", metricas_gerais["margem_lucro_liquido_%"], unidade="%", tipo="Flex")}'
             f'</div>',
             unsafe_allow_html=True
         )
@@ -987,6 +996,6 @@ with aba8:
         )
         st.metric("Nota Final", f"{detalhes['nota_final']*100:.1f} %")
         st.metric("Comissão Sugerida", f"R$ {detalhes['comissao']:.2f}", delta=None)
-        st.caption(f"Parâmetros atuais: COMISSAO_MAX = R$ {DEFAULT_CONFIG['COMISSAO_MAXIMA']:.0f}, "
-                   f"PESO_CONSUMO={DEFAULT_CONFIG['PESO_CONSUMO']:.0%}, PESO_RECEITA={DEFAULT_CONFIG['PESO_RECEITA']:.0%}, "
-                   f"Ociosidade máx. {DEFAULT_CONFIG['PENALIDADE_OCIOSIDADE_MAX']:.0%}.")
+        st.caption(f"Parâmetros atuais: COMISSAO_MAX = R$ {config.DEFAULT_CONFIG['COMISSAO_MAXIMA']:.0f}, "
+                   f"PESO_CONSUMO={config.DEFAULT_CONFIG['PESO_CONSUMO']:.0%}, PESO_RECEITA={config.DEFAULT_CONFIG['PESO_RECEITA']:.0%}, "
+                   f"Ociosidade máx. {config.DEFAULT_CONFIG['PENALIDADE_OCIOSIDADE_MAX']:.0%}.")

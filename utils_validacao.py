@@ -1,20 +1,6 @@
-"""
-Módulo de validação de anomalias em dados de viagens e despesas.
-Fornece verificações específicas para km, datas, consumo, preço de combustível e valores.
-Interface pública principal: `checar_anomalias` (não alterada).
-"""
-
 import pandas as pd
 from typing import Dict, List, Any
-
-# =============================================
-# Constantes de limites de consumo e preço
-# =============================================
-CONSUMO_MINIMO_KM_L = 1.0  # km/L mínimo esperado
-CONSUMO_MAXIMO_KM_L = 3.5  # km/L máximo esperado
-PRECO_DIESEL_MINIMO_R_L = 3.0  # R$/L mínimo aceitável
-PRECO_DIESEL_MAXIMO_R_L = 8.0  # R$/L máximo aceitável
-
+import config
 
 def gerar_preview_linhas(df: pd.DataFrame, colunas: List[str], max_linhas: int) -> List[str]:
     """
@@ -78,12 +64,12 @@ def validar_consumo_fora_limites(viagens: pd.DataFrame, max_linhas: int) -> List
     Emite warning para consumo muito baixo ou muito alto.
     """
     avisos: List[Dict[str, Any]] = []
-    excesso = viagens["media"] > CONSUMO_MAXIMO_KM_L
-    defasagem = viagens["media"] < CONSUMO_MINIMO_KM_L
+    excesso = viagens["media"] > config.CONSUMO_MAXIMO_KM_L
+    defasagem = viagens["media"] < config.CONSUMO_MINIMO_KM_L
 
     if excesso.any():
         avisos.append({
-            "msg": f"Média > {CONSUMO_MAXIMO_KM_L} km/L",
+            "msg": f"Média > {config.CONSUMO_MAXIMO_KM_L} km/L",
             "qtd": int(excesso.sum()),
             "nivel": "warning",
             "detalhes": gerar_preview_linhas(
@@ -95,7 +81,7 @@ def validar_consumo_fora_limites(viagens: pd.DataFrame, max_linhas: int) -> List
         })
     if defasagem.any():
         avisos.append({
-            "msg": f"Média < {CONSUMO_MINIMO_KM_L} km/L",
+            "msg": f"Média < {config.CONSUMO_MINIMO_KM_L} km/L",
             "qtd": int(defasagem.sum()),
             "nivel": "warning",
             "detalhes": gerar_preview_linhas(
@@ -134,12 +120,12 @@ def validar_preco_diesel_fora_limites(despesas_viagem: pd.DataFrame, max_linhas:
     Gera alertas de info para possíveis valores incorretos.
     """
     avisos: List[Dict[str, Any]] = []
-    baixo = despesas_viagem["preco_combustivel"] < PRECO_DIESEL_MINIMO_R_L
-    alto = despesas_viagem["preco_combustivel"] > PRECO_DIESEL_MAXIMO_R_L
+    baixo = despesas_viagem["preco_combustivel"] < config.PRECO_DIESEL_MINIMO_R_L
+    alto = despesas_viagem["preco_combustivel"] > config.PRECO_DIESEL_MAXIMO_R_L
 
     if baixo.any():
         avisos.append({
-            "msg": f"Diesel < R${PRECO_DIESEL_MINIMO_R_L:.2f}",
+            "msg": f"Diesel < R${config.PRECO_DIESEL_MINIMO_R_L:.2f}",
             "qtd": int(baixo.sum()),
             "nivel": "info",
             "detalhes": gerar_preview_linhas(
@@ -151,7 +137,7 @@ def validar_preco_diesel_fora_limites(despesas_viagem: pd.DataFrame, max_linhas:
         })
     if alto.any():
         avisos.append({
-            "msg": f"Diesel > R${PRECO_DIESEL_MAXIMO_R_L:.2f}",
+            "msg": f"Diesel > R${config.PRECO_DIESEL_MAXIMO_R_L:.2f}",
             "qtd": int(alto.sum()),
             "nivel": "info",
             "detalhes": gerar_preview_linhas(

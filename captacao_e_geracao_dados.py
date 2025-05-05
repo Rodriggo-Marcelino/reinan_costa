@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import datetime
+import config
 
 # ============================
 # 1. Carregamento de Dados Brutos
@@ -7,17 +8,17 @@ from datetime import datetime
 def carregar_dados_brutos():
     """Carrega todos os DataFrames brutos sem modificações."""
     df_desp_viagem = pd.read_csv(
-        "reinan_costa_despesas_de_viagem_db.csv", 
+        config.DESPESAS_VIAGEM_FILE, 
         parse_dates=["data"]
     )
     df_desp_fixa = pd.read_csv(
-        "reinan_costa_despesas_fixas_db.csv", 
+        config.DESPESAS_FIXAS_FILE, 
         parse_dates=["data"]
     )
-    df_motorista = pd.read_csv("reinan_costa_motorista_db.csv")
-    df_veiculo = pd.read_csv("reinan_costa_veiculo_db.csv")
+    df_motorista = pd.read_csv(config.MOTORISTA_FILE)
+    df_veiculo = pd.read_csv(config.VEICULO_FILE)
     df_viagem = pd.read_csv(
-        "reinan_costa_viagem_completa.csv", 
+        config.VIAGEM_COMPLETA_FILE, 
         parse_dates=["data_ida", "data_volta"]
     )
     return df_desp_viagem, df_desp_fixa, df_motorista, df_veiculo, df_viagem
@@ -171,8 +172,8 @@ def preparar_df_manutencao_por_veiculo(df_viagem, df_fixas):
     Retorna a quantidade de manutenções por veículo E CATEGORIA.
     """
     # Categorias de manutenção (case insensitive)
-    categorias_viagem = ["manutencao", "borracharia", "lavagem"]
-    categorias_fixas = ["manutencao", "borracharia", "plano manutencao", "pneu", "lavagem", "mecanico", "filtros", "pneu coberto"]
+    categorias_viagem = config.CATEGORIAS_MANUTENCAO_VIAGEM
+    categorias_fixas = config.CATEGORIAS_MANUTENCAO_FIXAS
 
     # Processa despesas de viagem
     manut_viagem = (
@@ -200,8 +201,8 @@ def preparar_df_manutencao_ao_longo_do_tempo(df_viagem, df_fixas):
     - Despesas fixas (categorias: MANUTENCAO, BORRACHARIA, PLANO MANUTENCAO, PNEU, LAVAGEM, MECANICO)
     """
     # Categorias de manutenção
-    categorias_viagem = ["manutencao", "borracharia", "lavagem"]
-    categorias_fixas = ["manutencao", "borracharia", "plano manutencao", "pneu", "lavagem", "mecanico", "filtros", "pneu coberto"]
+    categorias_viagem = config.CATEGORIAS_MANUTENCAO_VIAGEM
+    categorias_fixas = config.CATEGORIAS_MANUTENCAO_FIXAS
 
     # Processa despesas de viagem
     manut_viagem = (

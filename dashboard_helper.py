@@ -10,46 +10,83 @@ import captacao_e_geracao_dados as dados
 # 5.1 - Funções BASE para COMPONENTES DE LAYOUT
 # ----------------------------
 
-def card_compacto(label, valor,
-                  unidade="", prefixo="",
-                  cor_texto="#FFFFFF", cor_fundo=None,
-                  cor_borda=None):
-    # Formatação personalizada do valor
+def card_compacto(
+    label,
+    valor,
+    unidade: str = "",
+    prefixo: str = "",
+    cor_texto: str | None = None,
+    cor_fundo: str | None = None,
+    cor_borda: str | None = None,
+    tipo: str = "Normal",
+):
+    """
+    Cartão compacto estilizado.
+
+    Parâmetro `tipo` controla a cor automática do texto:
+      • "Positive" → verde fixo
+      • "Negative" → vermelho fixo
+      • "Flex"     → verde (>0), vermelho (<0), laranja (=0)
+      • "Normal"   → cor do tema (preto no claro, branco no escuro)
+
+    Se `cor_texto` for fornecido, ele sobrepõe a lógica de `tipo`.
+    """
+
+    # -------- formatação numérica --------
+    valor_formatado = str(valor)
+    valor_float = None
     try:
         valor_float = float(valor)
-        parte_inteira, parte_decimal = f"{valor_float:,.2f}".split(".")
-        parte_inteira_br = parte_inteira.replace(",", ".")  # Formata milhares com pontos
-        valor_formatado = f"{parte_inteira_br},{parte_decimal}"
-    except:
-        valor_formatado = str(valor)
-    
-    # Estilos dinâmicos
-    style_color = f"color: {cor_texto};" if cor_texto else "color: var(--text-color);"
-    style_bg = f"background-color: {cor_fundo};" if cor_fundo else "background-color: var(--secondary-background-color);"
-    style_border = f"border: 1px solid {cor_borda};" if cor_borda else "border: 1px solid var(--border-color);"
+        parte_int, parte_dec = f"{valor_float:,.2f}".split(".")
+        valor_formatado = f"{parte_int.replace(',', '.')}," + parte_dec
+    except Exception:
+        pass  # mantém string original se não numérico
 
+    # -------- cor do texto --------
+    if cor_texto:
+        color_css = f"color: {cor_texto};"
+    else:
+        if tipo == "Positive":
+            color_css = "color: #2E7D32;"            # verde
+        elif tipo == "Negative":
+            color_css = "color: #C62828;"            # vermelho
+        elif tipo == "Flex" and valor_float is not None:
+            if valor_float > 0:
+                color_css = "color: #2E7D32;"        # verde
+            elif valor_float < 0:
+                color_css = "color: #C62828;"        # vermelho
+            else:
+                color_css = "color: #FFA500;"        # laranja
+        else:  # "Normal" ou fallback
+            color_css = "color: var(--text-color);"  # preto ↔ branco conforme tema
+
+    # -------- fundo e borda --------
+    style_bg = (
+        f"background-color: {cor_fundo};"
+        if cor_fundo
+        else "background-color: var(--secondary-background-color);"
+    )
+    style_border = (
+        f"border: 1px solid {cor_borda};"
+        if cor_borda
+        else "border: 1px solid var(--border-color);"
+    )
+
+    # -------- HTML --------
     return f"""
     <div style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        {style_bg}
-        {style_border}
-        border-radius: 12px;
-        padding: 15px 20px;
-        margin: 5px;
-        min-width: 140px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-        cursor: pointer;
-    "
-    onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 6px 12px rgba(0,0,0,0.15)';"
-    onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';"
-    >
-        <div style="font-size: 0.9rem; color: var(--text-secondary-color); margin-bottom: 5px;">{label}</div>
-        <div style="font-size: 1.6rem; font-weight: 600; {style_color}">
-            {prefixo}{valor_formatado}<span style="font-size: 0.9rem; color: var(--text-secondary-color);">{unidade}</span>
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        {style_bg}{style_border}
+        border-radius:12px;padding:15px 20px;margin:5px;min-width:140px;
+        box-shadow:0 2px 4px rgba(0,0,0,0.1);transition:all 0.3s ease;cursor:pointer;"
+      onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 12px rgba(0,0,0,0.15)';"
+      onmouseout="this.style.transform='';this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
+        <div style="font-size:0.9rem;color:var(--text-secondary-color);margin-bottom:5px;">
+            {label}
+        </div>
+        <div style="font-size:1.6rem;font-weight:600;{color_css}">
+            {prefixo}{valor_formatado}
+            <span style="font-size:0.9rem;color:var(--text-secondary-color);">{unidade}</span>
         </div>
     </div>
     """

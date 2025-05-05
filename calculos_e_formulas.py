@@ -1,4 +1,5 @@
 import pandas as pd
+import config
 
 # ============================
 # 4. Fórmulas e Indicadores
@@ -98,8 +99,8 @@ def calcular_custo_pneus_por_km(desp_viagem, km_total):
 # Verificado
 # Bateu exatamento com o que tenho no outro relatorio
 def calcular_custo_manutencao_por_km(desp_viagem, desp_fixa, km_total):
-    categorias_viagem = ["MANUTENCAO", "BORRACHARIA", "LAVAGEM"]
-    categorias_fixa = ["MANUTENCAO", "BORRACHARIA", "PLANO MANUTENCAO", "PNEU", "LAVAGEM", "MECANICO"]
+    categorias_viagem = config.CATEGORIAS_MANUTENCAO_VIAGEM_UPPER
+    categorias_fixa = config.CATEGORIAS_MANUTENCAO_FIXAS_UPPER
     df_manut_viagem = desp_viagem[desp_viagem["categoria"].str.upper().isin(categorias_viagem)]
     df_manut_fixa = desp_fixa[desp_fixa["categoria"].str.upper().isin(categorias_fixa)]
     total = df_manut_viagem["valor"].sum() + df_manut_fixa["valor"].sum()
@@ -113,8 +114,8 @@ def calcular_frequencia_manutencao(desp_viagem, desp_fixas):
     - Despesas fixas (MANUTENCAO, BORRACHARIA, PLANO MANUTENCAO, PNEU, LAVAGEM, MECANICO)
     """
     # Categorias de manutenção (case insensitive)
-    categorias_viagem = ["manutencao", "borracharia", "plano manutencao"]
-    categorias_fixas = ["manutencao", "borracharia", "plano manutencao", "pneu", "lavagem", "mecanico"]
+    categorias_viagem = config.CATEGORIAS_MANUTENCAO_VIAGEM
+    categorias_fixas = config.CATEGORIAS_MANUTENCAO_FIXAS
 
     # Filtra despesas de viagem
     manut_viagem = desp_viagem[
@@ -159,8 +160,8 @@ def capex(df):
 # fui verificar no notion pois achei importante, essa aqui está on point
 # verificada
 def custo_manut(df_fixas, df_viagem_desp):
-    fixas  = ["MANUTENCAO","BORRACHARIA","PLANO MANUTENCAO", "PNEU","LAVAGEM","MECANICO", "FILTROS", "PNEU COBERTO"]
-    viagem = ["MANUTENCAO","BORRACHARIA","LAVAGEM"]
+    fixas  = config.CATEGORIAS_MANUTENCAO_FIXAS_UPPER
+    viagem = config.CATEGORIAS_MANUTENCAO_VIAGEM_UPPER
     return (
         df_fixas[df_fixas["categoria"].str.upper().isin(fixas)]["valor"].fillna(0).sum()
         + df_viagem_desp[df_viagem_desp["categoria"].str.upper().isin(viagem)]["valor"].fillna(0).sum()

@@ -1,13 +1,7 @@
 [theme]
-base="light"
-primaryColor="#1E90FF"
-backgroundColor="#FFFFFF"
-secondaryBackgroundColor="#F0F2F6"
-textColor="#000000"
-font="sans serif"
-
-[themeDark]
-primaryColor="#1E90FF"
-backgroundColor="#2D2D2D"
-secondaryBackgroundColor="#444444"
-textColor="#FFFFFF"
+base                     = "light"      # "light" ou "dark"
+primaryColor             = "#1E90FF"    # azul de destaque
+backgroundColor          = "#FFFFFF"    # fundo principal
+secondaryBackgroundColor = "#E3F2FD"    # fundo de painéis / cards
+textColor               = "#000000"     # texto principal
+font                     = "sans serif"
