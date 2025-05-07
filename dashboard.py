@@ -9,10 +9,22 @@ import calculos_e_formulas as calculos
 from utils_validacao import checar_anomalias
 from utils_comissao import calcular_comissao
 import config
+import unicodedata
 
 # ─── Configurações de login ───────────────────────────────────
-USUARIO = config.USUARIO
-SENHA   = config.SENHA
+USUARIOS = config.USUARIOS
+
+def normalize_username(u: str) -> str:
+    """
+    Remove espaços em sobra, acentos e coloca em lowercase.
+    Ex: ' João  ' → 'joao'
+    """
+    s = u or ""
+    # separa combinação Unicode (acentos) e remove os diacríticos
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    # trim e lowercase
+    return s.strip().lower()
 
 # Estado inicial
 if "autenticado" not in st.session_state:
@@ -20,12 +32,14 @@ if "autenticado" not in st.session_state:
 if "erro_login" not in st.session_state:
     st.session_state.erro_login = False  # flag para mensagens de erro
 
-# Callback executado ANTES do rerun automático do Streamlit
 def _autenticar():
-    user = st.session_state.user
-    pwd  = st.session_state.pwd
-    if user == USUARIO and pwd == SENHA:
-        st.session_state.autenticado = True          # rerun vem sozinho
+    raw_user = st.session_state.user
+    pwd      = st.session_state.pwd
+
+    user = normalize_username(raw_user)
+
+    if user in USUARIOS and pwd == USUARIOS[user]:
+        st.session_state.autenticado = True
     else:
         st.session_state.erro_login = True
 

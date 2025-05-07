@@ -6,8 +6,10 @@ VEICULO_FILE = "reinan_costa_veiculo_db.csv"                         # Dados dos
 VIAGEM_COMPLETA_FILE = "reinan_costa_viagem_completa.csv"            # Dados completos das viagens
 
 # Credenciais de login (utilizadas na função de autenticação em dashboard.py)
-USUARIO = "carlos"
-SENHA   = "110712"
+USUARIOS = {
+    "carlos": "110712",
+    "reinan": "010203"
+}
 
 # Limites numéricos para validações de consistência de dados (usados em utils_validacao.py)
 CONSUMO_MINIMO_KM_L       = 1.0  # km/L mínimo esperado (consumo muito baixo gera alerta)
