@@ -342,14 +342,14 @@ with aba1:  # Relatório de Viagem
         met = calcular_metricas_gerais(df_v, df_dv, dados_filtrados["despesas_fixas"])
         rep = {
             **met,
-            **{k: float(r.get(k, 0) or 0) for k in [
+            **{k: (float(r.get(k)) if pd.notna(r.get(k)) else 0.0) for k in [
                 "frete_ida","frete_volta","frete_extra",
                 "gasto_motorista","gasto_empresa","troco_da_viagem",
                 "km_inicial","km_final","lts_combustivel","preco_combustivel"
             ]},
             "data_saida":   r["data_ida"].date(),
             "data_chegada": r["data_volta"].date(),
-            "km_total":     float(r.get("km_total", 0) or 0),
+            "km_total":     (float(r.get("km_total")) if pd.notna(r.get("km_total")) else 0.0),
         }
 
         cia, cga = st.columns([3,2], gap="small")
